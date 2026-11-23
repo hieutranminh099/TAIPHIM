@@ -154,3 +154,21 @@ test("shows a warning and preserves selection for invalid or empty ranges", asyn
     assert.deepEqual(app.captions(true), ["Tập 05", "Tập 08"]);
   }
 });
+
+test("uses a discovered title until the user supplies their own", async () => {
+  const app = startApp();
+  await app.discover();
+  assert.equal(app.node("title").value, "Video kiểm thử");
+
+  app.node("title").value = "Tên đã sửa";
+  await app.node("title").trigger("input");
+  await app.discover();
+  await app.node("select-all").trigger("click");
+  await app.node("enqueue").trigger("click");
+  assert.equal(app.posts.find(({ url }) => url === "/api/jobs").payload.title, "Tên đã sửa");
+
+  app.node("title").value = "";
+  await app.node("title").trigger("input");
+  await app.discover();
+  assert.equal(app.node("title").value, "Video kiểm thử");
+});

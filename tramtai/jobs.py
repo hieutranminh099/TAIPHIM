@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from .hls import HLSError, download_hls
 from .net import NetError
-from .sources import Source, mp4_header, response_error
+from .sources import DIRECT_NAMES, HTML_TYPES, MEDIA_PREFIX, Source, media_header, media_type, read_prefix, response_error
 
 
 CONCURRENCY = 2
@@ -47,11 +47,11 @@ def chosen_directory(entered: str, default: Path) -> Path:
         raise ValueError("Không mở được thư mục lưu. Hãy kiểm tra đường dẫn và quyền truy cập.") from exc
 
 
-def publish_file(temporary: Path, directory: Path, title: str, number: int) -> str:
+def publish_file(temporary: Path, directory: Path, title: str, number: int, extension: str) -> str:
     stem = f"{title} - Tập {number:02d}"
     for collision in range(1, 10001):
         suffix = "" if collision == 1 else f" ({collision})"
-        destination = directory / f"{stem}{suffix}.mp4"
+        destination = directory / f"{stem}{suffix}.{extension}"
         try:
             if os.name == "nt":
                 # On Windows rename fails when the destination already exists.
@@ -65,40 +65,32 @@ def publish_file(temporary: Path, directory: Path, title: str, number: int) -> s
     raise ValueError("Có quá nhiều tệp trùng tên trong thư mục lưu.")
 
 
-async def download_mp4(client, url: str, temporary: Path, progress) -> None:
-    async with client.open(url) as response:
+async def download_direct(client, source: Source, temporary: Path, progress) -> None:
+    name = DIRECT_NAMES[source.kind]
+    async with client.open(source.url) as response:
         if response.status_code != 200:
             raise NetError(response_error(response.status_code))
-        content_type = response.headers.get("content-type", "").lower()
-        if content_type.startswith(("text/", "application/json", "application/xhtml+xml")):
-            raise NetError("Nguồn trả về văn bản thay vì video MP4. Hãy kiểm tra link tải trực tiếp.")
+        content_type = media_type(response.headers.get("content-type", ""))
+        if content_type in HTML_TYPES or content_type == "application/json":
+            raise NetError(f"Nguồn trả về văn bản thay vì video {name}. Hãy kiểm tra link tải trực tiếp.")
         length = response.headers.get("content-length", "")
         total = int(length) if re.fullmatch(r"[0-9]{1,20}", length.strip()) else None
         if response.headers.get("content-encoding", "identity").lower() != "identity":
             raise NetError("Nguồn dùng mã hóa truyền tải chưa được hỗ trợ.")
 
-        prefix = bytearray()
-        downloaded = 0
-        verified = False
         progress(0, total)
+        stream = response.aiter_bytes()
+        prefix = await read_prefix(stream, MEDIA_PREFIX if source.kind == "webm" else 8)
+        if not media_header(prefix, source.kind):
+            raise NetError(f"Nội dung tải về không có định dạng {name}.")
         with temporary.open("xb") as file:
-            async for chunk in response.aiter_bytes():
-                if not verified:
-                    required = 8 - len(prefix)
-                    prefix.extend(chunk[:required])
-                    if len(prefix) < 8:
-                        continue
-                    if not mp4_header(prefix):
-                        raise NetError("Nội dung tải về không có định dạng MP4.")
-                    file.write(prefix)
-                    downloaded = len(prefix)
-                    chunk = chunk[required:]
-                    verified = True
+            file.write(prefix)
+            downloaded = len(prefix)
+            progress(downloaded, total)
+            async for chunk in stream:
                 file.write(chunk)
                 downloaded += len(chunk)
                 progress(downloaded, total)
-            if not verified:
-                raise NetError("Nguồn không gửi đủ dữ liệu để nhận dạng tệp MP4.")
             if total is not None and downloaded != total:
                 raise NetError("Kết nối kết thúc trước khi nhận đủ dữ liệu video.")
             file.flush()
@@ -220,10 +212,11 @@ class Queue:
                 if job.source.kind == "hls":
                     await download_hls(self.client, job.source.url, temporary, progress, self.ffmpeg)
                 else:
-                    await download_mp4(self.client, job.source.url, temporary, progress)
+                    await download_direct(self.client, job.source, temporary, progress)
                 if job.directory.resolve(strict=True) != job.directory:
                     raise ValueError("Thư mục lưu đã thay đổi. Hãy chọn lại thư mục.")
-                job.filename = publish_file(temporary, job.directory, job.title, job.source.number)
+                extension = "mp4" if job.source.kind == "hls" else job.source.kind
+                job.filename = publish_file(temporary, job.directory, job.title, job.source.number, extension)
             job.status = "completed"
         except (NetError, HLSError, ValueError) as exc:
             job.error = str(exc)

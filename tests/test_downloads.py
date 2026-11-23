@@ -82,6 +82,8 @@ class FixtureServer:
                 return
             if method != "GET" or path not in self.media:
                 status = "404 Not Found"
+            elif path == "/published/restricted.mp4":
+                status = "403 Forbidden"
             elif path == "/downloads/fail-once.mp4" and first:
                 status = "503 Service Unavailable"
                 body = b"Temporarily unavailable"
@@ -94,8 +96,14 @@ class FixtureServer:
                 await writer.drain()
                 return
             content_type = "application/octet-stream"
-            if path.endswith(".mp4"):
+            if path.endswith(".html") or path == "/published/mislabeled.mp4":
+                content_type = "text/html; charset=utf-8"
+            elif path.endswith(".mp4"):
                 content_type = "video/mp4"
+            elif path.endswith(".webm"):
+                content_type = "video/webm"
+            elif path.endswith(".mov") or path == "/published/lantern":
+                content_type = "video/quicktime"
             elif path.endswith(".m3u8"):
                 content_type = "application/vnd.apple.mpegurl"
             extra = ""
@@ -211,6 +219,65 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
             b'#EXT-X-KEY:METHOD=AES-128,URI="fixture.key"\n'
             b"#EXTINF:1,\npiece00.ts\n#EXT-X-ENDLIST\n"
         )
+        make_media(
+            source / "tap-03.webm",
+            "-f", "lavfi", "-i", "color=c=yellow:s=128x72:r=15:d=1",
+            "-c:v", "libvpx", "-b:v", "64k",
+        )
+        make_media(
+            source / "tap-02.mov",
+            "-f", "lavfi", "-i", "color=c=purple:s=128x72:r=15:d=1",
+            "-c:v", "mpeg4", "-movflags", "+faststart",
+        )
+        cls.media.update({
+            "/catalog/media/tap-03.webm": (source / "tap-03.webm").read_bytes(),
+            "/published/tap-02.mov": (source / "tap-02.mov").read_bytes(),
+            "/published/lantern": (source / "tap-02.mov").read_bytes(),
+            "/published/restricted.mp4": b"Forbidden",
+            "/published/mislabeled.mp4": b"<!doctype html><title>Trang phat</title>",
+            "/published/tap-07.mp4": cls.media["/downloads/tap-01.mp4"],
+            "/published/tap-09.mp4": cls.media["/downloads/tap-02.mp4"],
+            "/catalog/season.html": """<!doctype html><html lang="vi">
+                <head>
+                  <title>Hải Đăng</title>
+                  <meta property="og:video" content="/published/tap-07.mp4">
+                  <meta property="og:video:type" content="video/mp4">
+                  <script type="application/ld+json">
+                    {"@context": "https://schema.org", "@type": "TVEpisode", "episodeNumber": 2,
+                     "name": "Ngọn đèn", "video": {"@type": "VideoObject", "contentUrl": "/published/lantern",
+                     "embedUrl": "/unlisted/schema-player.mp4"}}
+                  </script>
+                </head>
+                <body>
+                  <video data-episode="3">
+                    <source src="/published/restricted.mp4" type="video/mp4">
+                    <source src="media/tap-03.webm" type="video/webm">
+                  </video>
+                  <video data-episode="8" src="/hls/master.m3u8"></video>
+                  <a download href="/published/tap-09.mp4">Tải tập 9</a>
+                  <a download href="/published/mislabeled.mp4">Tải tập 10</a>
+                  <a download href="/unlisted/private.mp4?token=fixture-only">Tải tập 12</a>
+                  <video data-episode="13" src="/hls/encrypted.m3u8"></video>
+                  <a href="/unlisted/watch.html">Xem tập 11</a>
+                  <iframe src="/unlisted/frame.mp4"></iframe>
+                  <script>window.player = {file: '/unlisted/script.mp4'};</script>
+                </body></html>""".encode(),
+            "/catalog/player-only.html": """<!doctype html><html lang="vi">
+                <head>
+                  <title>Trang phát</title>
+                  <meta property="og:video" content="/unlisted/og-player.mp4">
+                  <meta property="og:video:type" content="text/html">
+                  <script type="application/ld+json">
+                    {"@context": "https://schema.org", "@type": "VideoObject",
+                     "embedUrl": "/unlisted/schema-player.mp4"}
+                  </script>
+                  <script src="/unlisted/config.js"></script>
+                </head>
+                <body>
+                  <a href="/unlisted/watch.html">Trang phát video</a>
+                  <iframe src="/unlisted/frame.mp4"></iframe>
+                </body></html>""".encode(),
+        })
 
     @asynccontextmanager
     async def serve(self):
@@ -388,6 +455,69 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result["streams"], [{"codec_name": "h264", "width": 128, "height": 72}])
                 self.assertAlmostEqual(float(result["format"]["duration"]), 2.0, places=2)
             self.assertCountEqual(directory.iterdir(), outputs)
+
+    async def test_public_html_discovers_published_episodes_and_downloads_media(self):
+        async with self.serve() as (api, fixture, directory):
+            response = await api.post("/api/discover", json={"links": FIXTURE_ORIGIN + "/catalog/season.html"})
+            self.assertEqual(response.status_code, 200, response.text)
+            found = response.json()
+            self.assertEqual(found["title"], "Hải Đăng")
+            expected = [
+                (2, "mov", "/published/lantern"),
+                (3, "webm", "/catalog/media/tap-03.webm"),
+                (7, "mp4", "/published/tap-07.mp4"),
+                (8, "hls", "/hls/master.m3u8"),
+                (9, "mp4", "/published/tap-09.mp4"),
+            ]
+            self.assertEqual([
+                (item["number"], item["kind"], item["url"]) for item in found["episodes"]
+            ], [(number, kind, FIXTURE_ORIGIN + path) for number, kind, path in expected])
+            self.assertCountEqual([path for path in fixture.requests if path != "/catalog/season.html"], [
+                *(path for _, _, path in expected), "/published/restricted.mp4", "/published/mislabeled.mp4",
+                "/hls/encrypted.m3u8",
+            ])
+
+            await self.enqueue(api, directory, found["episodes"], title=found["title"])
+            jobs = await self.wait_jobs(api, lambda items: (
+                len(items) == len(expected) and all(item["status"] in {"completed", "failed"} for item in items)
+            ))
+            for job, (number, kind, path) in zip(jobs, expected):
+                self.assertEqual(job["status"], "completed", job)
+                extension = "mp4" if kind == "hls" else kind
+                self.assertEqual(job["filename"], f"Hải Đăng - Tập {number:02}.{extension}")
+                output = (directory / job["filename"]).read_bytes()
+                if kind == "hls":
+                    self.assertEqual(output[4:8], b"ftyp")
+                    self.assertIn("/hls/piece00.ts", fixture.requests)
+                    self.assertIn("/hls/piece01.ts", fixture.requests)
+                else:
+                    self.assertEqual(output, self.media[path])
+
+    async def test_player_page_does_not_follow_embeds_scripts_or_other_pages(self):
+        async with self.serve() as (api, fixture, _):
+            response = await api.post("/api/discover", json={"links": FIXTURE_ORIGIN + "/catalog/player-only.html"})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["episodes"], [])
+            self.assertTrue(response.json()["messages"])
+            self.assertEqual(fixture.requests, ["/catalog/player-only.html"])
+
+    async def test_direct_webm_and_mov_keep_original_formats(self):
+        async with self.serve() as (api, _, directory):
+            paths = ["/published/tap-02.mov", "/catalog/media/tap-03.webm"]
+            response = await api.post("/api/discover", json={"links": "\n".join(
+                FIXTURE_ORIGIN + path for path in reversed(paths)
+            )})
+            self.assertEqual(response.status_code, 200, response.text)
+            episodes = response.json()["episodes"]
+            self.assertEqual([(item["number"], item["kind"]) for item in episodes], [(2, "mov"), (3, "webm")])
+            await self.enqueue(api, directory, episodes)
+            jobs = await self.wait_jobs(api, lambda items: (
+                len(items) == 2 and all(item["status"] in {"completed", "failed"} for item in items)
+            ))
+            for job, path in zip(jobs, paths):
+                self.assertEqual(job["status"], "completed", job)
+                self.assertTrue(job["filename"].endswith(Path(path).suffix))
+                self.assertEqual((directory / job["filename"]).read_bytes(), self.media[path])
 
 
 class PublicTransportTests(unittest.IsolatedAsyncioTestCase):

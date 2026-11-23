@@ -35,6 +35,7 @@ _UNSUPPORTED = {
 }
 _FORMATS = "mov,mpegts,aac,mp3,ac3,eac3"
 _ENCRYPTED = "Nguồn HLS sử dụng mã hóa hoặc DRM."
+_LIVE = "Nguồn HLS đang phát trực tiếp hoặc chưa kết thúc (thiếu EXT-X-ENDLIST)."
 
 
 @dataclass(frozen=True)
@@ -102,16 +103,8 @@ def _response_status(status: int, expected: int, subject: str) -> None:
         raise HLSError(f"{subject} trả về HTTP {status}; cần HTTP {expected}.")
 
 
-async def _read_playlist(client: PublicClient, url: str) -> tuple[str, list[str]]:
-    async with client.open(url) as response:
-        _response_status(response.status_code, 200, "Danh sách HLS")
-        data = bytearray()
-        async for chunk in response.aiter_bytes():
-            if len(data) + len(chunk) > _MANIFEST_LIMIT:
-                raise HLSError("Danh sách HLS vượt quá 8 MiB.")
-            data.extend(chunk)
-        base = response.url
-
+def parse_manifest(data: bytes | bytearray) -> list[str]:
+    """Decode an HLS manifest and reject unsupported features in its tags."""
     try:
         lines = data.decode("utf-8-sig").strip().split("\n")
     except UnicodeDecodeError:
@@ -129,7 +122,30 @@ async def _read_playlist(client: PublicClient, url: str) -> tuple[str, list[str]
             raise HLSError(_ENCRYPTED)
         if tag in _UNSUPPORTED:
             raise HLSError(f"Danh sách HLS dùng tính năng {tag[1:]} chưa hỗ trợ.")
-    return base, tags
+    return tags
+
+
+def validate_discovered_hls(data: bytes | bytearray) -> None:
+    """Check a source's root manifest without opening any referenced URLs."""
+    lines = parse_manifest(data)
+    if any(line.startswith("#EXT-X-STREAM-INF:") for line in lines):
+        return
+    if "#EXT-X-ENDLIST" not in lines:
+        raise HLSError(_LIVE)
+    if not any(line.startswith("#EXTINF:") for line in lines):
+        raise HLSError("Danh sách HLS không có đủ phân đoạn.")
+
+
+async def _read_playlist(client: PublicClient, url: str) -> tuple[str, list[str]]:
+    async with client.open(url) as response:
+        _response_status(response.status_code, 200, "Danh sách HLS")
+        data = bytearray()
+        async for chunk in response.aiter_bytes():
+            if len(data) + len(chunk) > _MANIFEST_LIMIT:
+                raise HLSError("Danh sách HLS vượt quá 8 MiB.")
+            data.extend(chunk)
+        base = response.url
+    return base, parse_manifest(data)
 
 
 def _select_variant(base: str, lines: list[str]) -> tuple[str, str | None]:
@@ -197,7 +213,7 @@ def _resource(url: str, value: str | None, previous: Resource | None) -> Resourc
 
 def _parse_media(base: str, lines: list[str]) -> Media:
     if "#EXT-X-ENDLIST" not in lines:
-        raise HLSError("Nguồn HLS đang phát trực tiếp hoặc chưa kết thúc (thiếu EXT-X-ENDLIST).")
+        raise HLSError(_LIVE)
 
     segments = []
     sequence = 0

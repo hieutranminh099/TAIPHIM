@@ -25,6 +25,7 @@ const statusLabels = {
   cancelled: "Đã hủy",
   failed: "Lỗi",
 };
+const formatLabels = { mp4: "MP4", hls: "HLS", webm: "WebM", mov: "MOV" };
 const numberFormat = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 const selected = new Set();
 const jobRows = new Map();
@@ -33,7 +34,7 @@ const busyJobs = new Set();
 let episodes = [];
 let episodeRows = [];
 let jobs = [];
-let lastSuggestedTitle = "";
+let manualTitle = false;
 let discovering = false;
 let enqueueing = false;
 let configLoaded = false;
@@ -148,7 +149,7 @@ function loadEpisodes(items) {
     label.title = description;
     label.dir = "auto";
     row.append(label);
-    row.append(element("span", "file-kind", episode.kind === "hls" ? "HLS" : "MP4"));
+    row.append(element("span", "file-kind", formatLabels[episode.kind] || "Video"));
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selected.add(episode);
       else selected.delete(episode);
@@ -174,6 +175,10 @@ function setSourceMessages(messages) {
   sourceMessages.hidden = messages.length === 0;
 }
 
+title.addEventListener("input", () => {
+  manualTitle = Boolean(title.value.trim());
+});
+
 byId("source-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const source = links.value.trim();
@@ -194,9 +199,8 @@ byId("source-form").addEventListener("submit", async (event) => {
     const result = await request("/api/discover", { links: source });
     loadEpisodes(result.episodes);
     setSourceMessages(result.messages);
-    if (result.title && (!title.value.trim() || title.value === lastSuggestedTitle)) {
-      title.value = result.title;
-      lastSuggestedTitle = result.title;
+    if (!manualTitle) {
+      title.value = result.episodes.length ? result.title || "" : "";
     }
   } catch (error) {
     loadEpisodes([]);

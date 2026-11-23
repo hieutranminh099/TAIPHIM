@@ -25,11 +25,11 @@
   <main class="shell">
     <div class="page-heading">
       <h1>Tải tập phim</h1>
-      <p>Chọn tập từ liên kết video và lưu trực tiếp vào máy của bạn.</p>
+      <p>Tìm tập, chọn khoảng và lưu video trực tiếp vào máy của bạn.</p>
     </div>
 
     <p class="notice warning" id="ffmpeg-notice" role="status" hidden>
-      Chưa tìm thấy FFmpeg. Bạn vẫn có thể tải MP4 trực tiếp. Để tải HLS, hãy cài FFmpeg và thêm thư mục <code>bin</code> của FFmpeg vào PATH, sau đó mở lại ứng dụng.
+      Chưa tìm thấy FFmpeg. Bạn vẫn có thể tải tệp video trực tiếp. Để tải HLS, hãy cài FFmpeg, thêm thư mục <code>bin</code> vào PATH và mở lại ứng dụng.
     </p>
 
     <div class="workspace">
@@ -49,7 +49,7 @@
               wrap="off" required aria-describedby="source-hint"
               placeholder="Dán liên kết tại đây…"></textarea>
             <div class="source-actions">
-              <p id="source-hint" class="help-text">Một link trang phim hoặc mỗi link MP4, M3U8 một dòng.</p>
+              <p id="source-hint" class="help-text">Dán trang phim công khai có công bố nguồn video hoặc link MP4, M4V, WebM, MOV, M3U8. Mỗi link một dòng.</p>
               <button type="submit" id="discover" class="button primary"><span class="icon icon-search" aria-hidden="true"></span>Tìm tập</button>
             </div>
           </form>

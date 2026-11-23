@@ -3,7 +3,7 @@ import shutil
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from .jobs import CONCURRENCY, Queue, chosen_directory, clean_title
 from .net import NetError, PublicClient, parse_public_url
-from .sources import Source, discover
+from .sources import Kind, Source, discover
 
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -32,7 +32,7 @@ class DiscoverInput(BaseModel):
 class EpisodeInput(BaseModel):
     number: Annotated[int, Field(ge=1, le=9999)]
     url: Link
-    kind: Literal["mp4", "hls"]
+    kind: Kind
     label: Annotated[str, StringConstraints(max_length=200)] = ""
 
 
@@ -100,10 +100,10 @@ def create_app(*, directory: Path | None = None, client=None, ffmpeg: str | None
     @app.post("/api/discover")
     async def find_episodes(body: DiscoverInput):
         try:
-            episodes, messages = await discover(queue.client, body.links)
+            episodes, messages, title = await discover(queue.client, body.links)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        return {"episodes": [asdict(episode) for episode in episodes], "messages": messages, "title": "Tên phim"}
+        return {"episodes": [asdict(episode) for episode in episodes], "messages": messages, "title": title}
 
     @app.get("/api/jobs")
     async def list_jobs():
