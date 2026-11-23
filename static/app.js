@@ -5,6 +5,7 @@ const links = byId("links");
 const title = byId("title");
 const directory = byId("directory");
 const discover = byId("discover");
+const discoverAll = byId("discover-all");
 const selectAll = byId("select-all");
 const rangeStart = byId("range-start");
 const rangeEnd = byId("range-end");
@@ -128,6 +129,7 @@ function updateSelection() {
   rangeEnd.disabled = !hasEpisodes;
   applyRange.disabled = !hasEpisodes;
   enqueue.disabled = selected.size === 0 || enqueueing || discovering;
+  discover.disabled = discoverAll.disabled = discovering || enqueueing;
   setText(selectAll, hasEpisodes && selected.size === episodes.length ? "Bỏ chọn tất cả" : "Chọn tất cả");
   setText(byId("selection-count"), "Đã chọn " + unitCount(selected.size, "tập"));
   setText(byId("enqueue-label"), enqueueing ? "Đang thêm…" : "Tải các tập đã chọn");
@@ -179,8 +181,8 @@ title.addEventListener("input", () => {
   manualTitle = Boolean(title.value.trim());
 });
 
-byId("source-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function findEpisodes(downloadAll = false) {
+  if (discovering || enqueueing) return;
   const source = links.value.trim();
   if (!source) {
     setSourceMessages(["Hãy dán ít nhất một liên kết."]);
@@ -189,8 +191,9 @@ byId("source-form").addEventListener("submit", async (event) => {
   }
 
   discovering = true;
-  discover.disabled = true;
-  discover.lastChild.textContent = "Đang tìm…";
+  const label = downloadAll ? byId("discover-all-label") : discover.lastChild;
+  const idleLabel = label.textContent;
+  setText(label, "Đang tìm…");
   setSourceMessages([]);
   showNotice(enqueueMessage, "");
   updateSelection();
@@ -202,16 +205,26 @@ byId("source-form").addEventListener("submit", async (event) => {
     if (!manualTitle) {
       title.value = result.episodes.length ? result.title || "" : "";
     }
+    if (downloadAll && episodes.length) {
+      for (const episode of episodes) selected.add(episode);
+      setText(label, "Đang thêm…");
+      await enqueueEpisodes(episodes);
+    }
   } catch (error) {
     loadEpisodes([]);
     setSourceMessages([error.message]);
   } finally {
     discovering = false;
-    discover.disabled = false;
-    discover.lastChild.textContent = "Tìm tập";
+    setText(label, idleLabel);
     updateSelection();
   }
+}
+
+byId("source-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  return findEpisodes();
 });
+discoverAll.addEventListener("click", () => findEpisodes(true));
 
 selectAll.addEventListener("click", () => {
   if (selected.size === episodes.length) selected.clear();
@@ -256,8 +269,7 @@ function mergeJobs(updates) {
   renderJobs();
 }
 
-enqueue.addEventListener("click", async () => {
-  const selectedEpisodes = episodes.filter((episode) => selected.has(episode));
+async function enqueueEpisodes(selectedEpisodes) {
   if (!selectedEpisodes.length || enqueueing) return;
   if (!directory.value.trim()) {
     showNotice(enqueueMessage, "Nhập đường dẫn thư mục lưu trên máy.");
@@ -281,6 +293,11 @@ enqueue.addEventListener("click", async () => {
     enqueueing = false;
     updateSelection();
   }
+}
+
+enqueue.addEventListener("click", () => {
+  if (discovering) return;
+  return enqueueEpisodes(episodes.filter((episode) => selected.has(episode)));
 });
 
 function newJobRow(id) {

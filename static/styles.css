@@ -195,11 +195,13 @@ input:focus-visible, textarea:focus-visible, button:focus-visible, .episode-row:
 
 .source-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: .65rem;
   align-items: center;
   margin-top: .1rem;
 }
+.source-buttons { display: flex; flex-wrap: wrap; gap: .45rem; }
 .help-text { max-width: 23rem; }
 .save-settings {
   display: grid;

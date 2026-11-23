@@ -52,7 +52,7 @@ class TestNode {
   }
 }
 
-function startApp() {
+function startApp({ found = true } = {}) {
   const nodes = new Map(
     Array.from(html.matchAll(/\bid="([^"]+)"/g), ([, id]) => [id, new TestNode(id)]),
   );
@@ -77,7 +77,9 @@ function startApp() {
       if (options.method === "POST") posts.push({ url, payload: JSON.parse(options.body) });
       const data = {
         "/api/config": { directory: "C:\\Videos", ffmpeg: true, concurrency: 2 },
-        "/api/discover": { episodes, messages: [], title: "Video kiểm thử" },
+        "/api/discover": found
+          ? { episodes, messages: [], title: "Video kiểm thử" }
+          : { episodes: [], messages: ["Nguồn chưa có link tải."], title: "Tên phim" },
         "/api/jobs": { jobs: [] },
       };
       assert.ok(url in data, "Unexpected request " + url);
@@ -106,6 +108,32 @@ function startApp() {
     },
   };
 }
+
+test("one click discovers and queues all episodes once", async () => {
+  const app = startApp();
+  app.node("links").value = "https://test.invalid/phim";
+  app.node("directory").value = "C:\\Videos";
+  await Promise.all([
+    app.node("discover-all").trigger("click"),
+    app.node("discover-all").trigger("click"),
+  ]);
+  assert.deepEqual(app.posts.map(({ url }) => url), ["/api/discover", "/api/jobs"]);
+  const { title, directory, episodes } = app.posts[1].payload;
+  assert.equal(title, "Video kiểm thử");
+  assert.equal(directory, "C:\\Videos");
+  assert.deepEqual(episodes.map(({ number }) => number), [1, 5, 8, 20, 21]);
+  assert.deepEqual(app.captions(true), ["Tập 01", "Tập 05", "Tập 08", "Tập 20", "Tập 21"]);
+  assert.equal(app.node("discover-all").disabled, false);
+});
+
+test("one click displays the source notice without queueing an empty result", async () => {
+  const app = startApp({ found: false });
+  app.node("links").value = "https://test.invalid/phim";
+  await app.node("discover-all").trigger("click");
+  assert.deepEqual(app.posts.map(({ url }) => url), ["/api/discover"]);
+  assert.equal(app.node("source-messages").children[0].textContent, "Nguồn chưa có link tải.");
+  assert.equal(app.node("discover-all").disabled, false);
+});
 
 test("sorts detected episodes and toggles select all", async () => {
   const app = startApp();

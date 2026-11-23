@@ -24,6 +24,8 @@ Trong PowerShell, cài FFmpeg bằng lệnh `winget install --id Gyan.FFmpeg -e`
 
 ## Tải video
 
+Để tải bằng một lần bấm, dán link, kiểm tra thư mục lưu rồi chọn **Tìm và tải tất cả**. Các tập tìm được sẽ tự vào hàng đợi. Nếu muốn tải một số tập, dùng **Tìm tập** và làm theo các bước dưới đây.
+
 1. Dán link trang công khai hoặc link MP4, M4V, WebM, MOV hay M3U8. Nhập mỗi link một dòng rồi bấm **Tìm tập**. Ứng dụng sắp theo số tập được công bố hoặc nhận ra trong đường dẫn. Các link còn lại được đánh số theo thứ tự xuất hiện, bỏ qua số đã có.
 2. Nhập **Tên phim** và đường dẫn đầy đủ của **Thư mục lưu**. Thư mục mặc định là `Downloads\Tram Tai Tap Phim` trong thư mục người dùng và sẽ được tạo khi tải lần đầu. Khi đổi sang đường dẫn khác, hãy chọn một thư mục cục bộ đã có.
 3. Dùng **Chọn tất cả**, đánh dấu từng tập hoặc nhập hai số ở **Chọn khoảng** và bấm **Áp dụng**. Hai đầu khoảng đều được tính. Sau đó bấm **Tải các tập đã chọn**.

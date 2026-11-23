@@ -50,7 +50,10 @@
               placeholder="Dán liên kết tại đây…"></textarea>
             <div class="source-actions">
               <p id="source-hint" class="help-text">Dán trang phim công khai có công bố nguồn video hoặc link MP4, M4V, WebM, MOV, M3U8. Mỗi link một dòng.</p>
-              <button type="submit" id="discover" class="button primary"><span class="icon icon-search" aria-hidden="true"></span>Tìm tập</button>
+              <div class="source-buttons">
+                <button type="submit" id="discover" class="button secondary"><span class="icon icon-search" aria-hidden="true"></span>Tìm tập</button>
+                <button type="button" id="discover-all" class="button primary"><span class="icon icon-download" aria-hidden="true"></span><span id="discover-all-label">Tìm và tải tất cả</span></button>
+              </div>
             </div>
           </form>
           <ul id="source-messages" class="notice warning message-list" role="status" hidden></ul>
