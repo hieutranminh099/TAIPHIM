@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Trạm Tải Tập Phim</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span class="icon icon-download"></span></span>
+        <span>Trạm Tải Tập Phim</span>
+      </div>
+      <span class="service-status" id="service-status" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="service-label">Đang kết nối</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <div class="page-heading">
+      <h1>Tải tập phim</h1>
+      <p>Chọn tập từ liên kết video và lưu trực tiếp vào máy của bạn.</p>
+    </div>
+
+    <p class="notice warning" id="ffmpeg-notice" role="status" hidden>
+      Chưa tìm thấy FFmpeg. Bạn vẫn có thể tải MP4 trực tiếp. Để tải HLS, hãy cài FFmpeg và thêm thư mục <code>bin</code> của FFmpeg vào PATH, sau đó mở lại ứng dụng.
+    </p>
+
+    <div class="workspace">
+      <div class="input-column">
+        <section class="panel" aria-labelledby="source-heading">
+          <div class="panel-header">
+            <span class="panel-icon" aria-hidden="true"><span class="icon icon-link"></span></span>
+            <div>
+              <h2 id="source-heading">Nguồn video</h2>
+              <p>Chỉ dùng nguồn bạn có quyền tải.</p>
+            </div>
+          </div>
+
+          <form id="source-form" class="source-form" novalidate>
+            <label for="links">Liên kết nguồn</label>
+            <textarea id="links" name="links" rows="3" maxlength="1000000" spellcheck="false" autocomplete="off"
+              wrap="off" required aria-describedby="source-hint"
+              placeholder="Dán liên kết tại đây…"></textarea>
+            <div class="source-actions">
+              <p id="source-hint" class="help-text">Một link trang phim hoặc mỗi link MP4, M3U8 một dòng.</p>
+              <button type="submit" id="discover" class="button primary"><span class="icon icon-search" aria-hidden="true"></span>Tìm tập</button>
+            </div>
+          </form>
+          <ul id="source-messages" class="notice warning message-list" role="status" hidden></ul>
+
+          <div class="save-settings">
+            <div class="field">
+              <label for="title">Tên phim</label>
+              <input id="title" name="title" type="text" maxlength="200" placeholder="Tên phim" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="directory">Thư mục lưu</label>
+              <div class="path-control">
+                <span class="icon icon-folder" aria-hidden="true"></span>
+                <input id="directory" name="directory" type="text" maxlength="2048"
+                  aria-describedby="directory-hint" placeholder="Đường dẫn thư mục trên máy" autocomplete="off" spellcheck="false">
+              </div>
+              <span id="directory-hint" class="sr-only">Nhập đường dẫn đầy đủ đến thư mục trên máy chạy ứng dụng.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel episodes-panel" aria-labelledby="episodes-heading">
+          <div class="panel-header">
+            <span class="panel-icon" aria-hidden="true"><span class="icon icon-film"></span></span>
+            <div>
+              <h2 id="episodes-heading">Danh sách tập</h2>
+              <p id="episode-count" aria-live="polite">0 tập</p>
+            </div>
+            <button type="button" id="select-all" class="button secondary push-right" disabled>Chọn tất cả</button>
+          </div>
+
+          <form id="range-form" class="range-form" aria-labelledby="range-label" novalidate>
+            <span class="range-label" id="range-label">Chọn khoảng</span>
+            <div class="range-controls">
+              <label for="range-start" class="sr-only">Từ tập</label>
+              <input type="number" id="range-start" min="1" step="1" placeholder="Từ" disabled>
+              <span aria-hidden="true">–</span>
+              <label for="range-end" class="sr-only">Đến tập</label>
+              <input type="number" id="range-end" min="1" step="1" placeholder="Đến" disabled>
+              <button id="apply-range" class="button secondary" type="submit" disabled>Áp dụng</button>
+            </div>
+          </form>
+          <p id="range-message" class="notice warning" role="status" hidden></p>
+
+          <div class="empty-state episode-empty" id="episodes-empty">
+            <p>Chưa có tập nào</p>
+            <span>Tìm tập từ các liên kết bạn đã dán.</span>
+          </div>
+          <ul id="episode-list" class="episode-list" aria-label="Các tập tìm được" hidden></ul>
+
+          <div class="episodes-actions">
+            <span id="selection-count">Đã chọn 0 tập</span>
+            <button id="enqueue" type="button" class="button primary" disabled>
+              <span class="icon icon-download" aria-hidden="true"></span><span id="enqueue-label">Tải các tập đã chọn</span>
+            </button>
+          </div>
+          <p id="enqueue-message" class="notice" role="status" hidden></p>
+        </section>
+      </div>
+
+      <section class="panel queue-panel" aria-labelledby="queue-heading">
+        <div class="panel-header">
+          <span class="panel-icon" aria-hidden="true"><span class="icon icon-queue"></span></span>
+          <div>
+            <h2 id="queue-heading">Hàng đợi tải</h2>
+            <p id="queue-count">0 lượt tải</p>
+          </div>
+          <span class="concurrency-tag push-right" id="concurrency">2 lượt cùng lúc</span>
+        </div>
+        <dl class="queue-summary">
+          <div>
+            <dt><span class="summary-dot dot-running" aria-hidden="true"></span>Đang tải</dt>
+            <dd id="running-count">0</dd>
+          </div>
+          <div>
+            <dt><span class="summary-dot dot-waiting" aria-hidden="true"></span>Đang chờ</dt>
+            <dd id="queued-count">0</dd>
+          </div>
+          <div>
+            <dt><span class="summary-dot dot-done" aria-hidden="true"></span>Hoàn tất</dt>
+            <dd id="completed-count">0</dd>
+          </div>
+        </dl>
+        <p id="queue-message" class="notice warning" role="status" hidden></p>
+        <div class="empty-state queue-empty" id="queue-empty">
+          <span class="empty-mark" aria-hidden="true"><span class="icon icon-download"></span></span>
+          <p>Hàng đợi đang trống</p>
+          <span>Chọn các tập và bắt đầu tải để theo dõi tiến độ tại đây.</span>
+        </div>
+        <ul id="job-list" class="job-list" aria-label="Các lượt tải" hidden></ul>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
