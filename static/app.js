@@ -79,9 +79,12 @@ async function request(path, payload) {
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = data?.detail;
-    if (typeof detail === "string" && detail) throw new Error(detail);
-    if (Array.isArray(detail)) throw new Error("Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra các mục đã nhập.");
-    throw new Error("Ứng dụng không xử lý được yêu cầu (HTTP " + response.status + ").");
+    let message = "Ứng dụng không xử lý được yêu cầu (HTTP " + response.status + ").";
+    if (typeof detail === "string" && detail) message = detail;
+    if (Array.isArray(detail)) message = "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra các mục đã nhập.";
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
   if (!data) throw new Error("Ứng dụng trả về dữ liệu không hợp lệ.");
   return data;
@@ -432,6 +435,7 @@ function setConnection(online) {
 async function loadConfig() {
   const config = await request("/api/config");
   if (!directory.value.trim()) directory.value = config.directory;
+  videoImport.configure(config);
   byId("ffmpeg-notice").hidden = Boolean(config.ffmpeg);
   setText(byId("concurrency"), unitCount(config.concurrency, "lượt cùng lúc"));
   configLoaded = true;
@@ -456,4 +460,5 @@ async function poll() {
   }
 }
 
+const videoImport = createVideoImport();
 poll();

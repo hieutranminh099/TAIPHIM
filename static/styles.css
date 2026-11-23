@@ -108,7 +108,14 @@ ul { padding: 0; list-style: none; }
   padding: 2.25rem 1.75rem 2rem;
 }
 
-.page-heading { margin-bottom: 1.625rem; }
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.625rem;
+}
 .page-heading h1 {
   font-size: clamp(2rem, 3.5vw, 2.85rem);
   font-weight: 720;
@@ -188,7 +195,7 @@ textarea {
 
 input::placeholder, textarea::placeholder { color: #a295af; opacity: 1; }
 
-input:focus-visible, textarea:focus-visible, button:focus-visible, .episode-row:focus-within {
+input:focus-visible, textarea:focus-visible, button:focus-visible, .import-jump:focus-visible, .episode-row:focus-within {
   outline: 2px solid #ddaaff;
   outline-offset: 2px;
 }
@@ -432,6 +439,61 @@ input:focus-visible, textarea:focus-visible, button:focus-visible, .episode-row:
 .shell > .notice { margin: 0 0 1rem; }
 .range-form + .notice { margin: 0 0 .6rem; }
 
+.import-jump { font-size: .9375rem; font-weight: 650; text-decoration: none; }
+.import-panel { margin-top: 1.125rem; scroll-margin-top: 1rem; }
+.import-panel h3 { margin: 0; font-size: .9375rem; }
+.import-scan-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .65rem;
+}
+.import-scan-form .button { min-height: 2.5rem; }
+.import-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) minmax(0, 1.2fr);
+  gap: .75rem;
+  margin-top: 1rem;
+}
+.import-help { max-width: none; margin-top: .45rem; }
+.import-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  margin-top: .9rem;
+}
+.import-list-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .3rem .5rem;
+  min-height: 2rem;
+  margin-bottom: .4rem;
+}
+#import-file-count { margin-left: .25rem; font-weight: 400; }
+.import-file-list, .import-plan-list { max-height: 22rem; }
+.import-file-label { flex-wrap: wrap; column-gap: .65rem; }
+.import-file-name { flex: 1 1 11rem; min-width: 0; overflow-wrap: anywhere; }
+.import-file-meta { color: var(--muted); font-size: .8125rem; font-weight: 400; }
+.import-plan-list { margin: 0; padding: 0 .7rem 0 2.25rem; }
+.import-plan-row { padding: .55rem 0 .55rem .1rem; }
+.import-plan-row::marker { color: var(--muted-strong); font-variant-numeric: tabular-nums; }
+.import-plan-original, .import-preview-name { overflow-wrap: anywhere; }
+.import-plan-original { color: var(--body); font-size: .875rem; font-weight: 650; }
+.import-preview-name { margin-top: .3rem; color: var(--muted-strong); font-size: .875rem; }
+.import-plan-controls, .import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.import-plan-controls { margin-top: .35rem; }
+.import-plan-controls .import-number { width: 5rem; height: 2rem; }
+.import-number[aria-invalid="true"] { border-color: var(--danger); }
+.import-actions { justify-content: flex-end; margin-top: .8rem; }
+.import-actions .notice { flex: 1 1 18rem; margin: 0; }
+.import-actions .primary { white-space: normal; min-width: 0; }
+.import-results { margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--line); }
+.import-results .help-text { max-width: none; margin-top: .3rem; }
+.import-result-list { margin-top: .55rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.import-result-list .job-top strong, .import-result-list .job-filename { white-space: normal; overflow-wrap: anywhere; }
+
 .icon { display: inline-block; position: relative; width: 1em; height: 1em; flex: none; }
 .icon::before, .icon::after { content: ""; position: absolute; }
 .icon-download {
@@ -544,6 +606,10 @@ input:focus-visible, textarea:focus-visible, button:focus-visible, .episode-row:
   .queue-empty { min-height: 12rem; }
 }
 
+@media (max-width: 670px) {
+  .import-settings, .import-lists, .import-result-list { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 530px) {
   .topbar { padding-inline: 1rem; }
   .topbar-inner { min-height: 3.7rem; }
@@ -551,6 +617,8 @@ input:focus-visible, textarea:focus-visible, button:focus-visible, .episode-row:
   .panel { padding: .95rem; }
   .source-actions { align-items: flex-start; }
   .save-settings { grid-template-columns: minmax(0, 1fr); }
+  .import-scan-form { grid-template-columns: minmax(0, 1fr); }
+  .import-scan-form .button { justify-self: start; }
   .queue-summary { gap: .33rem; }
   .queue-summary > div { padding: .55rem .42rem; }
   .queue-summary dt { gap: .3rem; }

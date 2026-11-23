@@ -1,5 +1,6 @@
 import re
 import shutil
+from asyncio import to_thread
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints
 
+from .imports import ImportBatches, preview_files, scan_files, source_folder, target_folder
 from .jobs import CONCURRENCY, Queue, chosen_directory, clean_title
 from .net import NetError, PublicClient, parse_public_url
 from .sources import Kind, Source, discover
@@ -42,14 +44,35 @@ class JobInput(BaseModel):
     episodes: list[EpisodeInput] = Field(min_length=1, max_length=250)
 
 
+class ImportScanInput(BaseModel):
+    source_directory: Annotated[str, StringConstraints(min_length=1, max_length=2048)]
+
+
+class ImportFileInput(BaseModel):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=255)]
+    number: Annotated[int, Field(ge=1, le=9999)]
+
+
+class ImportBatchInput(ImportScanInput):
+    directory: Annotated[str, StringConstraints(max_length=2048)] = ""
+    title: Annotated[str, StringConstraints(max_length=200)] = "Tên phim"
+    files: list[ImportFileInput] = Field(min_length=1)
+
+    def selections(self) -> list[tuple[str, int]]:
+        return [(item.name, item.number) for item in self.files]
+
+
 def create_app(*, directory: Path | None = None, client=None, ffmpeg: str | None = None) -> FastAPI:
-    default_directory = directory or Path.home() / "Downloads" / "Tram Tai Tap Phim"
+    downloads_directory = Path.home() / "Downloads"
+    default_directory = directory or downloads_directory / "Tram Tai Tap Phim"
     queue = Queue(PublicClient() if client is None else client, shutil.which("ffmpeg") if ffmpeg is None else ffmpeg)
+    imports = ImportBatches()
 
     @asynccontextmanager
     async def lifespan(_app):
         yield
         await queue.close()
+        await imports.close()
 
     app = FastAPI(
         title="Trạm Tải Tập Phim",
@@ -95,7 +118,12 @@ def create_app(*, directory: Path | None = None, client=None, ffmpeg: str | None
 
     @app.get("/api/config")
     async def config():
-        return {"directory": str(default_directory), "ffmpeg": bool(queue.ffmpeg), "concurrency": CONCURRENCY}
+        return {
+            "directory": str(default_directory),
+            "downloads_directory": str(downloads_directory),
+            "ffmpeg": bool(queue.ffmpeg),
+            "concurrency": CONCURRENCY,
+        }
 
     @app.post("/api/discover")
     async def find_episodes(body: DiscoverInput):
@@ -142,6 +170,39 @@ def create_app(*, directory: Path | None = None, client=None, ffmpeg: str | None
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
         return {"job": job.view()}
+
+    @app.post("/api/import/scan")
+    def find_import_files(body: ImportScanInput):
+        try:
+            return {"files": scan_files(body.source_directory)}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/import/preview")
+    def preview_import(body: ImportBatchInput):
+        try:
+            source_folder(body.source_directory)
+            target = chosen_directory(body.directory, default_directory, create_default=False)
+            return {"files": preview_files(target, clean_title(body.title), body.selections())}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post("/api/import/batches", status_code=201)
+    async def start_import(body: ImportBatchInput):
+        try:
+            source = await to_thread(source_folder, body.source_directory)
+            target = await to_thread(target_folder, body.directory, default_directory)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        batch = imports.add(source, target, clean_title(body.title), body.selections())
+        return batch.view()
+
+    @app.get("/api/import/batches/{batch_id}")
+    async def import_progress(batch_id: str):
+        batch = imports.batches.get(batch_id)
+        if batch is None:
+            raise HTTPException(404, "Không tìm thấy lô nhập video.")
+        return batch.view()
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

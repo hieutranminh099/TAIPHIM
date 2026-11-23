@@ -35,6 +35,12 @@ Tệp hoàn tất có dạng `Tên phim - Tập 01.mp4`. HLS được ghép thà
 
 HLS hỗ trợ danh sách phát hữu hạn, không mã hóa, có dấu kết thúc `EXT-X-ENDLIST`. Ứng dụng chọn biến thể có độ phân giải cao nhất rồi xét băng thông, lấy luồng âm thanh mặc định nếu tách riêng và dùng FFmpeg sao chép các luồng tương thích vào MP4. HLS cần chỗ trống cho cả phân đoạn đã tải và tệp đang ghép.
 
+## Nhập video đã tải từ Cốc Cốc
+
+1. Trong Cốc Cốc, tải các video MP4 bạn có quyền lưu và chờ tải xong. Mở **Nhập video đã tải** trong Trạm Tải Tập Phim. Dùng đường dẫn `Downloads` được gợi ý hoặc nhập đường dẫn đầy đủ đến thư mục Cốc Cốc đã lưu tệp, rồi bấm **Tìm tệp**.
+2. Chọn từng tệp hoặc bấm **Chọn tất cả**. Nhập **Tên phim** và kiểm tra **Thư mục đích**, mặc định lấy từ **Thư mục lưu**. Ứng dụng nhận diện số tập từ các tên như `Tập 03`, `tap-03` và `EP03`. Nhập **Số tập bắt đầu** để đánh số liên tiếp theo thứ tự đang hiển thị. Bạn có thể sửa số tập hoặc đổi vị trí từng tệp trước khi nhập.
+3. Kiểm tra tên đích trong bản xem trước rồi bấm **Nhập các tập đã chọn**. Theo dõi tiến độ và kết quả từng tệp ngay trong mục nhập. Bản sao có dạng `Tên phim - Tập 01.mp4`, thêm ` (2)`, ` (3)` khi trùng tên. Các tệp gốc vẫn ở thư mục Cốc Cốc.
+
 ## Những trang có thể nhận diện tự động
 
 Ứng dụng đọc nguồn `src` hoặc `data-src` trong thẻ `<video>` và `<source>`, nút tải do trang công bố bằng thuộc tính `download`, liên kết `enclosure` có loại video, `VideoObject.contentUrl` hoặc `encoding` trong JSON-LD, và video Open Graph có loại tệp phù hợp. Khi một video khai báo nhiều nguồn thay thế, ứng dụng thử các nguồn công khai và giữ một mục đã xác minh. Nếu nhập một trang có nguồn hợp lệ, ứng dụng có thể gợi ý tên phim từ tiêu đề trang.
@@ -56,4 +62,4 @@ Trang `15623` công bố thông tin ba tập. Nguồn của thẻ HLS và danh s
 node --test tests/test_frontend.cjs
 ```
 
-Bộ kiểm thử Python cần `ffmpeg` và `ffprobe` trên PATH để chạy toàn bộ. Các bài kiểm thử tự tạo video, phục vụ qua HTTP và xác minh việc nhận diện từ HTML, tải trực tiếp MP4, WebM, MOV và ghép HLS thành MP4. Kiểm thử Node.js 18 trở lên chạy mã JavaScript thật với DOM và API mô phỏng. Giao diện khi mở lần đầu có danh sách tập và hàng đợi trống.
+Bộ kiểm thử Python cần `ffmpeg` và `ffprobe` trên PATH để chạy toàn bộ. Các bài kiểm thử tự tạo video, phục vụ qua HTTP và xác minh việc nhận diện từ HTML, tải trực tiếp MP4, WebM, MOV và ghép HLS thành MP4. Các bài kiểm thử nhập MP4 dùng thư mục tạm và đối chiếu từng byte của bản sao với tệp gốc. Kiểm thử Node.js 18 trở lên chạy mã JavaScript thật với DOM và API mô phỏng. Giao diện khi mở lần đầu có danh sách tập và hàng đợi trống.

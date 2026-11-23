@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>Trạm Tải Tập Phim</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/import.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
@@ -24,8 +25,11 @@
 
   <main class="shell">
     <div class="page-heading">
-      <h1>Tải tập phim</h1>
-      <p>Tìm tập, chọn khoảng và lưu video trực tiếp vào máy của bạn.</p>
+      <div>
+        <h1>Tải tập phim</h1>
+        <p>Tải tập từ liên kết hoặc nhập video đã tải trên máy.</p>
+      </div>
+      <a class="button secondary import-jump" href="#video-import"><span class="icon icon-folder" aria-hidden="true"></span>Nhập video đã tải</a>
     </div>
 
     <p class="notice warning" id="ffmpeg-notice" role="status" hidden>
@@ -146,6 +150,83 @@
         <ul id="job-list" class="job-list" aria-label="Các lượt tải" hidden></ul>
       </section>
     </div>
+
+    <section id="video-import" class="panel import-panel" aria-labelledby="import-heading">
+      <div class="panel-header">
+        <span class="panel-icon" aria-hidden="true"><span class="icon icon-folder"></span></span>
+        <div>
+          <h2 id="import-heading">Nhập video đã tải</h2>
+          <p>Sao chép MP4 đã tải xong từ Cốc Cốc và giữ nguyên tệp gốc.</p>
+        </div>
+      </div>
+
+      <form id="import-scan-form" class="import-scan-form" novalidate>
+        <div class="field">
+          <label for="import-source">Thư mục Cốc Cốc lưu video</label>
+          <div class="path-control">
+            <span class="icon icon-folder" aria-hidden="true"></span>
+            <input id="import-source" type="text" maxlength="2048" autocomplete="off" spellcheck="false"
+              placeholder="C:\Users\Tên người dùng\Downloads">
+          </div>
+        </div>
+        <button id="import-scan" class="button secondary" type="submit"><span class="icon icon-search" aria-hidden="true"></span><span id="import-scan-label">Tìm tệp</span></button>
+      </form>
+      <p id="import-scan-message" class="notice" role="status" hidden></p>
+
+      <div id="import-details" hidden>
+        <div class="import-settings">
+          <div class="field">
+            <label for="import-title">Tên phim</label>
+            <input id="import-title" type="text" maxlength="200" autocomplete="off" placeholder="Tên phim">
+          </div>
+          <div class="field">
+            <label for="import-start">Số tập bắt đầu</label>
+            <input id="import-start" type="number" min="1" max="9999" step="1" placeholder="Tự nhận diện"
+              aria-describedby="import-start-hint">
+          </div>
+          <div class="field">
+            <label for="import-directory">Thư mục đích</label>
+            <div class="path-control">
+              <span class="icon icon-folder" aria-hidden="true"></span>
+              <input id="import-directory" type="text" maxlength="2048" autocomplete="off" spellcheck="false"
+                placeholder="Dùng thư mục lưu hiện tại">
+            </div>
+          </div>
+        </div>
+        <p id="import-start-hint" class="help-text import-help">Để trống để dùng số nhận diện từ tên tệp. Nhập số bắt đầu để đánh số liên tiếp theo thứ tự xem trước.</p>
+
+        <div class="import-lists">
+          <div class="import-list-column">
+            <div class="import-list-header">
+              <h3>Tệp MP4 <span id="import-file-count" class="help-text"></span></h3>
+              <button id="import-select-all" class="button secondary compact" type="button" disabled>Chọn tất cả</button>
+            </div>
+            <ul id="import-file-list" class="episode-list import-file-list" aria-label="Tệp MP4 tìm được"></ul>
+          </div>
+          <div class="import-list-column">
+            <div class="import-list-header">
+              <h3>Xem trước</h3>
+              <span id="import-selection-count" class="help-text" role="status"></span>
+            </div>
+            <p id="import-plan-empty" class="empty-state episode-empty">Chọn tệp để xem số tập và tên tệp đích.</p>
+            <ol id="import-plan-list" class="episode-list import-plan-list" aria-label="Thứ tự nhập và tên tệp đích" hidden></ol>
+          </div>
+        </div>
+
+        <div class="import-actions">
+          <p id="import-message" class="notice" role="status" hidden></p>
+          <button id="import-preview-retry" class="button secondary compact" type="button" hidden>Thử lại bản xem trước</button>
+          <button id="import-enqueue" class="button primary" type="button" disabled>Nhập các tập đã chọn</button>
+        </div>
+      </div>
+
+      <div id="import-results" class="import-results" hidden>
+        <h3>Kết quả nhập</h3>
+        <p id="import-result-summary" class="help-text" role="status"></p>
+        <p id="import-result-message" class="notice warning" role="status" hidden></p>
+        <ul id="import-result-list" class="job-list import-result-list" aria-label="Tiến độ và kết quả từng tệp"></ul>
+      </div>
+    </section>
   </main>
 </body>
 </html>

@@ -6,6 +6,7 @@ import tempfile
 import time
 import unicodedata
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -27,19 +28,23 @@ def clean_title(title: str) -> str:
     return f"_{clean}" if RESERVED_NAME.match(clean) else clean
 
 
-def chosen_directory(entered: str, default: Path) -> Path:
+def chosen_directory(entered: str, default: Path | None, *, create_default: bool = True) -> Path:
     try:
-        raw = entered.strip() or str(default)
+        raw = entered.strip() or (str(default) if default is not None else "")
         if raw.startswith(("//", "\\\\")) or "\x00" in raw:
             raise ValueError("Hãy chọn một thư mục trên ổ đĩa cục bộ.")
         path = Path(raw).expanduser()
         if not path.is_absolute():
             raise ValueError("Hãy nhập đường dẫn đầy đủ đến thư mục lưu.")
-        if path == default:
-            path.mkdir(parents=True, exist_ok=True)
-        path = path.resolve(strict=True)
+        is_default = path == default
+        path = path.resolve(strict=not is_default)
         if str(path).startswith(("//", "\\\\")):
             raise ValueError("Hãy chọn một thư mục trên ổ đĩa cục bộ.")
+        if is_default:
+            if create_default:
+                path.mkdir(parents=True, exist_ok=True)
+            elif not os.path.lexists(path):
+                return path
         if not path.is_dir():
             raise ValueError("Đường dẫn đã chọn phải là thư mục.")
         return path
@@ -47,22 +52,35 @@ def chosen_directory(entered: str, default: Path) -> Path:
         raise ValueError("Không mở được thư mục lưu. Hãy kiểm tra đường dẫn và quyền truy cập.") from exc
 
 
-def publish_file(temporary: Path, directory: Path, title: str, number: int, extension: str) -> str:
+def destination_names(title: str, number: int, extension: str) -> Iterator[str]:
     stem = f"{title} - Tập {number:02d}"
     for collision in range(1, 10001):
         suffix = "" if collision == 1 else f" ({collision})"
-        destination = directory / f"{stem}{suffix}.{extension}"
+        yield f"{stem}{suffix}.{extension}"
+    raise ValueError("Có quá nhiều tệp trùng tên trong thư mục lưu.")
+
+
+def publish_file(
+    temporary: Path, directory: Path, title: str, number: int, extension: str, *, directory_fd: int | None = None
+) -> str:
+    for filename in destination_names(title, number, extension):
+        destination = directory / filename
         try:
             if os.name == "nt":
                 # On Windows rename fails when the destination already exists.
                 temporary.rename(destination)
             else:
                 # A hard link on the same volume publishes the completed file without overwriting.
-                os.link(temporary, destination)
-            return destination.name
+                os.link(
+                    temporary,
+                    destination if directory_fd is None else filename,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            return filename
         except FileExistsError:
             continue
-    raise ValueError("Có quá nhiều tệp trùng tên trong thư mục lưu.")
 
 
 async def download_direct(client, source: Source, temporary: Path, progress) -> None:
