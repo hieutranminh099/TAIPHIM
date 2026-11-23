@@ -232,10 +232,12 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
         cls.media.update({
             "/catalog/media/tap-03.webm": (source / "tap-03.webm").read_bytes(),
             "/published/tap-02.mov": (source / "tap-02.mov").read_bytes(),
+            "/published/tap-02": (source / "tap-02.mov").read_bytes(),
             "/published/lantern": (source / "tap-02.mov").read_bytes(),
             "/published/restricted.mp4": b"Forbidden",
             "/published/mislabeled.mp4": b"<!doctype html><title>Trang phat</title>",
             "/published/tap-07.mp4": cls.media["/downloads/tap-01.mp4"],
+            "/published/open-video": cls.media["/downloads/tap-01.mp4"],
             "/published/tap-09.mp4": cls.media["/downloads/tap-02.mp4"],
             "/catalog/season.html": """<!doctype html><html lang="vi">
                 <head>
@@ -277,6 +279,22 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
                   <a href="/unlisted/watch.html">Trang phát video</a>
                   <iframe src="/unlisted/frame.mp4"></iframe>
                 </body></html>""".encode(),
+            "/catalog/explicit-downloads.html": """<!doctype html><html lang="vi">
+                <head>
+                  <title>Hải trình</title>
+                  <link rel="enclosure" href="/published/tap-02" type="video/quicktime">
+                </head>
+                <body>
+                  <a download href="../published/open-video">Tập 07</a>
+                  <a href="/unlisted/ordinary-page">Xem danh sách</a>
+                </body></html>""".encode(),
+            "/catalog/no-video.html": b"<!doctype html><title>Catalog</title><main>Catalog</main>",
+            "/catalog/empty-native.html": b"<!doctype html><title>Watch</title><video controls></video>",
+            "/catalog/metadata-player.html": b"""<!doctype html><title>Player metadata</title>
+                <script type="application/ld+json">
+                  {"@context":"https://schema.org","@type":"VideoObject",
+                   "embedUrl":"/unlisted/metadata-player.mp4"}
+                </script>""",
         })
 
     @asynccontextmanager
@@ -500,6 +518,44 @@ class DownloadTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.json()["episodes"], [])
             self.assertTrue(response.json()["messages"])
             self.assertEqual(fixture.requests, ["/catalog/player-only.html"])
+
+    async def test_explicit_download_anchor_and_enclosure_without_filename_extensions(self):
+        async with self.serve() as (api, fixture, directory):
+            page = "/catalog/explicit-downloads.html"
+            response = await api.post("/api/discover", json={"links": FIXTURE_ORIGIN + page})
+            self.assertEqual(response.status_code, 200, response.text)
+            found = response.json()
+            self.assertEqual(found["title"], "Hải trình")
+            self.assertEqual([
+                (item["number"], item["kind"], item["url"]) for item in found["episodes"]
+            ], [
+                (2, "mov", FIXTURE_ORIGIN + "/published/tap-02"),
+                (7, "mp4", FIXTURE_ORIGIN + "/published/open-video"),
+            ])
+            self.assertCountEqual(fixture.requests, [page, "/published/tap-02", "/published/open-video"])
+
+            await self.enqueue(api, directory, [found["episodes"][1]], title=found["title"])
+            jobs = await self.wait_jobs(api, lambda items: (
+                len(items) == 1 and items[0]["status"] in {"completed", "failed"}
+            ))
+            self.assertEqual(jobs[0]["status"], "completed", jobs[0])
+            self.assertEqual(jobs[0]["filename"], "Hải trình - Tập 07.mp4")
+            self.assertEqual((directory / jobs[0]["filename"]).read_bytes(), self.media["/published/open-video"])
+
+    async def test_empty_player_and_embed_metadata_have_a_distinct_playback_notice(self):
+        async with self.serve() as (api, fixture, _):
+            pages = ["/catalog/no-video.html", "/catalog/empty-native.html", "/catalog/metadata-player.html"]
+            notices = []
+            for page in pages:
+                response = await api.post("/api/discover", json={"links": FIXTURE_ORIGIN + page})
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json()["episodes"], [])
+                notices.append(" ".join(response.json()["messages"]).casefold())
+            for notice in notices[1:]:
+                self.assertNotEqual(notice, notices[0])
+                self.assertIn("phát", notice)
+                self.assertIn("công khai", notice)
+            self.assertEqual(fixture.requests, pages)
 
     async def test_direct_webm_and_mov_keep_original_formats(self):
         async with self.serve() as (api, _, directory):

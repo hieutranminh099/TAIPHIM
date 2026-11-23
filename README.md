@@ -35,15 +35,17 @@ HLS hỗ trợ danh sách phát hữu hạn, không mã hóa, có dấu kết th
 
 ## Những trang có thể nhận diện tự động
 
-Ứng dụng đọc nguồn `src` hoặc `data-src` trong thẻ `<video>` và `<source>`, liên kết đến tệp video, `VideoObject.contentUrl` hoặc `encoding` trong JSON-LD, và video Open Graph có loại tệp phù hợp. Khi một video khai báo nhiều nguồn thay thế, ứng dụng thử các nguồn công khai và giữ một mục đã xác minh. Nếu nhập một trang có nguồn hợp lệ, ứng dụng có thể gợi ý tên phim từ tiêu đề trang.
+Ứng dụng đọc nguồn `src` hoặc `data-src` trong thẻ `<video>` và `<source>`, nút tải do trang công bố bằng thuộc tính `download`, liên kết `enclosure` có loại video, `VideoObject.contentUrl` hoặc `encoding` trong JSON-LD, và video Open Graph có loại tệp phù hợp. Khi một video khai báo nhiều nguồn thay thế, ứng dụng thử các nguồn công khai và giữ một mục đã xác minh. Nếu nhập một trang có nguồn hợp lệ, ứng dụng có thể gợi ý tên phim từ tiêu đề trang.
 
 Trang chỉ nhúng trình phát, cung cấp nguồn thông qua JavaScript hoặc yêu cầu đăng nhập, quyền truy cập hay DRM cần một link tải trực tiếp được dịch vụ cấp và bạn có quyền dùng. Với danh sách tập phân trang, có thể dán từng trang tập hoặc từng link video. Ứng dụng không dò trang nhúng hay gửi cookie đăng nhập.
 
-## Hai trang đã khảo sát
+## Các trang đã khảo sát
 
 HTML công khai của trang mẫu trả HTTP 200. Dữ liệu gắn trong trang công bố **1 tập**. Thẻ trình phát HLS có `src` trống. Các trường URL phát và danh sách URL từng tập cũng trống. Dữ liệu có cấu trúc `VideoObject` trỏ đến trang nhúng. [Trang mẫu](https://gkg0.aqkmowihz.cc/video/15372/)
 
-Trang trong ảnh cũng trả HTTP 200 và công bố thông tin một tập. Nguồn của thẻ HLS và các trường URL phát trống. JSON-LD chỉ dẫn đến trang nhúng. Điều khoản của cùng máy chủ hạn chế tải hàng loạt bằng phương tiện kỹ thuật. Hai URL đã khảo sát hiển thị thông báo giới hạn và hướng dẫn nhập link video trực tiếp có quyền tải. [Trang trong ảnh](https://v24t.aqkmowihz.cc/video/15586/) · [Điều khoản](https://v24t.aqkmowihz.cc/terms/)
+Trang `15586` công bố thông tin một tập. Nguồn của thẻ HLS và các trường URL phát trống. JSON-LD chỉ dẫn đến trang nhúng. [Trang `15586`](https://v24t.aqkmowihz.cc/video/15586/) · [Điều khoản](https://v24t.aqkmowihz.cc/terms/)
+
+Trang `15623` công bố thông tin ba tập. Nguồn của thẻ HLS và danh sách URL phát đều trống. JSON-LD dẫn đến trang nhúng. Điều khoản của máy chủ hạn chế tải hàng loạt bằng phương tiện kỹ thuật. Ứng dụng hiển thị thông báo khi phát hiện trình phát hoặc thông tin video mà HTML thiếu link tải được hỗ trợ. [Trang `15623`](https://q5k2d4.aqkmowihz.cc/video/15623/) · [Điều khoản](https://q5k2d4.aqkmowihz.cc/terms/)
 
 ## Kiểm thử tự động
 

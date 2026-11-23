@@ -15,6 +15,10 @@ _MAX_GROUPS = 60
 _MAX_CANDIDATES = 5
 _MAX_DRAFT_GROUPS = 180
 _MEDIA_SUFFIXES = (".mp4", ".m4v", ".mov", ".webm", ".m3u8")
+_NONVIDEO_SUFFIXES = (
+    ".7z", ".gif", ".htm", ".html", ".jpeg", ".jpg", ".json", ".mp3", ".pdf",
+    ".png", ".rar", ".svg", ".txt", ".webp", ".xml", ".zip",
+)
 _MEDIA_MIMES = {
     "video/mp4",
     "video/x-m4v",
@@ -31,6 +35,8 @@ _EPISODE = re.compile(
     r"([0-9]{1,4})(?=$|[^\w]|_)",
     re.IGNORECASE,
 )
+_IFRAME_PLAYER = re.compile(r"(?<![a-z])(?:player|video)(?![a-z])", re.IGNORECASE)
+_OG_VIDEO_PROPERTIES = {"og:video", "og:video:url", "og:video:secure_url", "og:video:type"}
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,7 @@ class MediaGroup:
 class Page:
     title: str | None
     groups: list[MediaGroup]
+    has_player: bool = False
 
 
 def _text(value: object) -> str | None:
@@ -84,11 +91,22 @@ def _media_suffix(value: str) -> bool:
         return False
 
 
+def _explicit_download(attrs: dict[str, str], href: str) -> bool:
+    if "download" not in attrs:
+        return False
+    try:
+        path = unquote(urlsplit(href).path).lower()
+        filename = attrs["download"].strip().lower()
+    except ValueError:
+        return False
+    return not path.endswith(_NONVIDEO_SUFFIXES) and not filename.endswith(_NONVIDEO_SUFFIXES)
+
+
 def _media_link(raw_url: object, mime: str | None, base: str) -> MediaLink | None:
     if not isinstance(raw_url, str):
         return None
     raw_url = raw_url.strip()
-    if not raw_url or raw_url.startswith(("#", "?")) or any(
+    if not raw_url or raw_url.startswith("#") or any(
         ord(char) < 32 or char == "\\" for char in raw_url
     ):
         return None
@@ -128,6 +146,18 @@ def _add_tag_media(group: MediaGroup, attrs: dict[str, str], base: str) -> None:
         _add(group, _media_link(attrs.get(name), mime, base))
 
 
+def _iframe_is_player(attrs: dict[str, str]) -> bool:
+    permissions = {
+        part.strip().partition(" ")[0]
+        for part in attrs.get("allow", "").lower().split(";")
+    }
+    return (
+        "allowfullscreen" in attrs
+        or bool(permissions & {"autoplay", "encrypted-media", "picture-in-picture"})
+        or any(_IFRAME_PLAYER.search(attrs.get(name, "")) for name in ("title", "id", "name", "class"))
+    )
+
+
 class _Markup(HTMLParser):
     CDATA_CONTENT_ELEMENTS = (*HTMLParser.CDATA_CONTENT_ELEMENTS, "iframe", "xmp", "noembed", "noframes")
 
@@ -135,6 +165,7 @@ class _Markup(HTMLParser):
         super().__init__()
         self.base = base
         self.saw_base = False
+        self.has_player = False
         self.groups: list[MediaGroup] = []
         self.graphs: list[str] = []
         self.og: list[tuple[str, str]] = []
@@ -162,13 +193,30 @@ class _Markup(HTMLParser):
             self.in_title = True
         elif tag == "meta":
             key = (attrs.get("property") or attrs.get("name") or "").strip().lower()
-            if key in {"og:title", "og:video", "og:video:url", "og:video:secure_url", "og:video:type"}:
+            content = attrs.get("content", "").strip()
+            if key == "og:title" or key in _OG_VIDEO_PROPERTIES:
                 if len(self.og) < _MAX_DRAFT_GROUPS:
-                    self.og.append((key, attrs.get("content", "").strip()))
+                    self.og.append((key, content))
+            if content and (
+                key in _OG_VIDEO_PROPERTIES
+                or key == "twitter:player"
+                or (key == "twitter:card" and content.lower() == "player")
+                or (key == "og:type" and content.lower().startswith("video."))
+            ):
+                self.has_player = True
+        elif tag == "link" and "enclosure" in attrs.get("rel", "").lower().split():
+            mime = _mime(attrs.get("type"))
+            if mime and len(self.groups) < _MAX_DRAFT_GROUPS:
+                link = _media_link(attrs.get("href"), mime, self.base)
+                if link:
+                    group = _tag_group(attrs)
+                    _add(group, link)
+                    self.groups.append(group)
         elif tag == "script":
             media_type = attrs.get("type", "").split(";", 1)[0].strip().lower()
             self.in_json_ld = media_type == "application/ld+json" and len(self.graphs) < 24
         elif tag == "video":
+            self.has_player = True
             self.video = None
             if len(self.groups) < _MAX_DRAFT_GROUPS:
                 self.video = _tag_group(attrs)
@@ -176,12 +224,15 @@ class _Markup(HTMLParser):
                 self.groups.append(self.video)
         elif tag == "source" and self.video is not None:
             _add_tag_media(self.video, attrs, self.base)
+        elif tag == "iframe" and _iframe_is_player(attrs):
+            self.has_player = True
         elif tag == "a":
             self.handle_endtag("a")
             href = attrs.get("href", "")
             mime = _mime(attrs.get("type"))
             if len(self.groups) >= _MAX_DRAFT_GROUPS or not (
                 mime or _media_suffix(href) or _media_suffix(attrs.get("download", ""))
+                or _explicit_download(attrs, href)
             ):
                 return
             link = _media_link(href, mime, self.base)
@@ -233,7 +284,12 @@ def _schema_types(node: dict) -> set[str]:
     return types
 
 
-def _video_metadata(group: MediaGroup, items: list, base: str) -> None:
+def _video_metadata(group: MediaGroup, items: list, base: str) -> bool:
+    has_player = any(
+        isinstance(item, dict)
+        and any(isinstance(url, str) and url.strip() for url in _items(item.get("embedUrl")))
+        for item in items
+    )
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -248,12 +304,14 @@ def _video_metadata(group: MediaGroup, items: list, base: str) -> None:
                 ):
                     _add(group, _media_link(url, mime, base))
                     if len(group.candidates) >= _MAX_CANDIDATES:
-                        return
+                        return has_player
+    return has_player
 
 
-def _structured(graphs: list[str], base: str) -> tuple[str | None, list[MediaGroup]]:
+def _structured(graphs: list[str], base: str) -> tuple[str | None, list[MediaGroup], bool]:
     title = None
     groups: list[MediaGroup] = []
+    has_player = False
     for graph in graphs:
         try:
             pending = [json.loads(graph)]
@@ -278,14 +336,14 @@ def _structured(graphs: list[str], base: str) -> tuple[str | None, list[MediaGro
                 if title is None and isinstance(series, dict):
                     title = _text(series.get("name"))
                 group = MediaGroup(_number(node.get("episodeNumber"), numeric=True), label)
-                _video_metadata(
+                has_player = _video_metadata(
                     group, [*_items(node.get("video")), *_items(node.get("encoding"))], base
-                )
+                ) or has_player
                 if group.candidates:
                     groups.append(group)
             elif "VideoObject" in types:
                 group = MediaGroup(_number(label), label)
-                _video_metadata(group, [node], base)
+                has_player = _video_metadata(group, [node], base) or has_player
                 if group.candidates:
                     groups.append(group)
             elif "Movie" in types or "TVSeries" in types:
@@ -294,7 +352,7 @@ def _structured(graphs: list[str], base: str) -> tuple[str | None, list[MediaGro
             for name in ("@graph", "mainEntity", "itemListElement", "item", "episode"):
                 if node.get(name) is not None:
                     pending.append(node[name])
-    return title, groups
+    return title, groups, has_player
 
 
 def _open_graph(entries: list[tuple[str, str]], base: str) -> list[MediaGroup]:
@@ -364,10 +422,10 @@ def parse_page(html: str, base: str) -> Page:
     markup.feed(html)
     markup.close()
     markup.handle_endtag("a")
-    structured_title, structured_groups = _structured(markup.graphs, markup.base)
+    structured_title, structured_groups, structured_player = _structured(markup.graphs, markup.base)
     og_title = next((_text(value) for key, value in markup.og if key == "og:title"), None)
     title = structured_title or og_title or _text(" ".join(markup.head_title))
     groups = _merged([
         *structured_groups, *markup.groups, *_open_graph(markup.og, markup.base)
     ])
-    return Page(title, groups)
+    return Page(title, groups, markup.has_player or structured_player)

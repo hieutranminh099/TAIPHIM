@@ -43,10 +43,9 @@ SEASON_EPISODE = re.compile(r"(?<![a-z0-9])s\d{1,3}e(\d{1,4})(?![a-z0-9])")
 HTML_PREFIX = re.compile(rb"\s*(?:<!doctype\s+html\b|<!--|<(?:html|head|meta|title|body|main|video)\b)", re.I)
 CHARSET = re.compile(r"\bcharset\s*=\s*['\"]?([\w.-]+)", re.I)
 ACCESS_PARAMETERS = {"access_token", "auth", "authorization", "hdnea", "hdnts", "jwt", "key-pair-id", "policy", "sig", "signature", "token"}
-SAMPLE_PAGES = {("gkg0.aqkmowihz.cc", "/video/15372"), ("v24t.aqkmowihz.cc", "/video/15586")}
-SAMPLE_NOTICE = (
-    "Trang này công bố thông tin tập nhưng chưa xác minh được liên kết tải công khai. "
-    "Hãy nhập link video trực tiếp mà bạn có quyền tải."
+PLAYBACK_NOTICE = (
+    "Trang có trình phát hoặc thông tin video, nhưng HTML không cung cấp link tải công khai mà ứng dụng nhận diện được. "
+    "Hãy dùng link tải trực tiếp do trang cung cấp nếu có."
 )
 PAGE_NOTICE = (
     "Không tìm thấy liên kết video công khai trong HTML của trang. "
@@ -249,14 +248,11 @@ async def discover(client, links: str) -> tuple[list[Source], list[str], str]:
             if url in seen:
                 return [], None, []
             seen.add(url)
-            parts = urlsplit(url)
-            if (parts.hostname, parts.path.rstrip("/")) in SAMPLE_PAGES:
-                raise NetError(SAMPLE_NOTICE)
             result = kind_from_path(url) or await checked(inspect_input, url)
             if isinstance(result, str):
                 return [DiscoveredMedia(url, result, episode_number(url))], None, []
             if not result.groups:
-                raise NetError(PAGE_NOTICE)
+                raise NetError(PLAYBACK_NOTICE if result.has_player else PAGE_NOTICE)
             media, errors = await find_page_media(result.groups)
             notes = [f"Dòng {line_no}. {error}" for error in errors[:3]]
             return media, result.title if media else None, notes
