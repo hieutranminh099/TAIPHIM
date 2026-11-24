@@ -37,9 +37,12 @@ HLS hỗ trợ danh sách phát hữu hạn, không mã hóa, có dấu kết th
 
 ## Nhập video đã tải từ Cốc Cốc
 
-1. Trong Cốc Cốc, tải các video MP4 bạn có quyền lưu và chờ tải xong. Mở **Nhập video đã tải** trong Trạm Tải Tập Phim. Dùng đường dẫn `Downloads` được gợi ý hoặc nhập đường dẫn đầy đủ đến thư mục Cốc Cốc đã lưu tệp, rồi bấm **Tìm tệp**.
-2. Chọn từng tệp hoặc bấm **Chọn tất cả**. Nhập **Tên phim** và kiểm tra **Thư mục đích**, mặc định lấy từ **Thư mục lưu**. Ứng dụng nhận diện số tập từ các tên như `Tập 03`, `tap-03` và `EP03`. Nhập **Số tập bắt đầu** để đánh số liên tiếp theo thứ tự đang hiển thị. Bạn có thể sửa số tập hoặc đổi vị trí từng tệp trước khi nhập.
-3. Kiểm tra tên đích trong bản xem trước rồi bấm **Nhập các tập đã chọn**. Theo dõi tiến độ và kết quả từng tệp ngay trong mục nhập. Bản sao có dạng `Tên phim - Tập 01.mp4`, thêm ` (2)`, ` (3)` khi trùng tên. Các tệp gốc vẫn ở thư mục Cốc Cốc.
+1. Mở trang tập phim trong Cốc Cốc và bấm phát video bạn có quyền lưu. Bấm mũi tên tải màu xanh để mở **Download video & audio**, rồi chọn **Download video** khi công cụ nhận ra video. Nhấn `Ctrl+J` để kiểm tra lượt tải đã hoàn tất và xem MP4 được lưu ở đâu. [Hướng dẫn tải video của Cốc Cốc](https://support.coccoc.com/desktop/huong-dan-tai-video-audio)
+2. Mở **Nhập video đã tải** trong Trạm Tải Tập Phim. Dùng `Downloads` được gợi ý hoặc nhập đường dẫn đầy đủ đến thư mục Cốc Cốc đã lưu MP4, rồi bấm **Tìm tệp**.
+3. Đánh dấu từng tệp hoặc bấm **Chọn tất cả**. Nhập **Tên phim** và kiểm tra **Thư mục đích**, mặc định lấy từ **Thư mục lưu**. Ứng dụng nhận diện số tập từ các tên như `Tập 03`, `tap-03` và `EP03`. Nhập **Số tập bắt đầu** để đánh số liên tiếp theo thứ tự đang hiển thị. Bạn có thể sửa số tập hoặc đổi vị trí từng tệp trước khi nhập.
+4. Kiểm tra tên đích rồi bấm **Nhập các tập đã chọn**. Bản sao có dạng `Tên phim - Tập 01.mp4`, thêm ` (2)`, ` (3)` khi trùng tên. Tệp gốc vẫn ở thư mục Cốc Cốc.
+
+Nếu công cụ tải đứng lâu ở **Searching for Video/Audio…**, thử thoát hẳn Cốc Cốc rồi mở lại trang và phát video. Trên bản Cốc Cốc 156 cho Linux, có thể thử khởi động lại riêng dịch vụ nền của tiện ích. Mở `coccoc://serviceworker-internals/`, dùng `Ctrl+F` tìm `jdfkmiabjpfjacifcmihfdjhpnjpiick` và bấm **Stop** trong đúng mục tiện ích này. Sau đó mở lại trang video trong tab mới, bấm phát và mở lại công cụ tải.
 
 ## Những trang có thể nhận diện tự động
 
